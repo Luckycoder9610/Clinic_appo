@@ -1,4 +1,4 @@
-// CareFlow Clinic Front Desk Client Application
+// CareFlow Clinic Front Desk Client Application with Twists T6, T1, T2
 let state = {
   doctors: [],
   selectedDoctorId: null,
@@ -8,10 +8,12 @@ let state = {
     late_fee: 25.0,
   },
   activeTab: "schedule",
+  simulatedClock: null,
 };
 
 // --- DOM ELEMENTS ---
 const clockEl = document.getElementById("current-clock");
+const outboxBadge = document.getElementById("outbox-badge");
 const policySummaryEl = document.getElementById("policy-summary-text");
 const doctorPillsContainer = document.getElementById("doctor-pills-container");
 const scheduleDatePicker = document.getElementById("schedule-date-picker");
@@ -20,6 +22,7 @@ const scheduleHeaderSub = document.getElementById("schedule-header-sub");
 const timelineSlotsContainer = document.getElementById("timeline-slots-container");
 const metricBooked = document.getElementById("metric-booked");
 const metricAvailable = document.getElementById("metric-available");
+const metricNoshow = document.getElementById("metric-noshow");
 const metricCancelled = document.getElementById("metric-cancelled");
 const cancelledSection = document.getElementById("cancelled-appointments-section");
 const cancelledList = document.getElementById("cancelled-appointments-list");
@@ -33,6 +36,25 @@ const bookDoctorSelect = document.getElementById("book-doctor-select");
 const bookDateInput = document.getElementById("book-date-input");
 const bookTimeInput = document.getElementById("book-time-input");
 const bookDuration = document.getElementById("book-duration");
+
+const modalReschedule = document.getElementById("modal-reschedule");
+const rescheduleForm = document.getElementById("reschedule-form");
+const rescheduleApptId = document.getElementById("reschedule-appt-id");
+const reschedulePatientName = document.getElementById("reschedule-patient-name");
+const rescheduleDoctorName = document.getElementById("reschedule-doctor-name");
+const rescheduleCurrentTime = document.getElementById("reschedule-current-time");
+const rescheduleDateInput = document.getElementById("reschedule-date-input");
+const rescheduleTimeInput = document.getElementById("reschedule-time-input");
+const rescheduleDuration = document.getElementById("reschedule-duration");
+const rescheduleErrorBox = document.getElementById("reschedule-error-box");
+const rescheduleErrorMessage = document.getElementById("reschedule-error-message");
+
+const modalClock = document.getElementById("modal-clock");
+const modalCurrentClockDisplay = document.getElementById("modal-current-clock-display");
+const outboxMessagesContainer = document.getElementById("outbox-messages-container");
+const outboxListCount = document.getElementById("outbox-list-count");
+const customClockForm = document.getElementById("custom-clock-form");
+const customClockInput = document.getElementById("custom-clock-input");
 
 const modalCancel = document.getElementById("modal-cancel");
 const cancelForm = document.getElementById("cancel-form");
@@ -85,28 +107,135 @@ function showToast(message, type = "success") {
   }, 4000);
 }
 
-function updateClock() {
-  const now = new Date();
-  if (clockEl) {
-    clockEl.textContent = now.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  }
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-setInterval(updateClock, 1000);
-updateClock();
 
 // --- INITIALIZATION ---
 async function initApp() {
   scheduleDatePicker.value = state.selectedDate;
   await fetchSettings();
+  await fetchClock();
   await fetchDoctors();
+  await fetchOutbox();
   setupEventListeners();
+}
+
+// --- CLOCK & OUTBOX (LEVEL 2 & 3) ---
+async function fetchClock() {
+  try {
+    const res = await fetch("/clock");
+    const data = await res.json();
+    if (data.clock) {
+      state.simulatedClock = new Date(data.clock);
+      updateClockDisplay();
+    }
+  } catch (err) {
+    console.error("Error fetching clock:", err);
+  }
+}
+
+function updateClockDisplay() {
+  const d = state.simulatedClock || new Date();
+  if (clockEl) {
+    clockEl.textContent = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  if (modalCurrentClockDisplay) {
+    modalCurrentClockDisplay.textContent = d.toISOString().replace("T", " ").slice(0, 19);
+  }
+}
+
+async function advanceClock(minutes) {
+  try {
+    const res = await fetch("/clock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ advance_minutes: minutes }),
+    });
+    const data = await res.json();
+    if (data.clock) {
+      state.simulatedClock = new Date(data.clock);
+      updateClockDisplay();
+      showToast(
+        `Clock advanced by ${minutes}m. Reminders sent: ${data.reminders_sent}, No-shows marked: ${data.no_shows_marked}`,
+        "success"
+      );
+      await fetchOutbox();
+      await loadSchedule();
+    }
+  } catch (err) {
+    console.error("Error advancing clock:", err);
+  }
+}
+
+async function setClockTime(isoString) {
+  try {
+    const res = await fetch("/clock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ timestamp: isoString }),
+    });
+    const data = await res.json();
+    if (data.clock) {
+      state.simulatedClock = new Date(data.clock);
+      updateClockDisplay();
+      showToast(
+        `Clock set to ${isoString}. Reminders sent: ${data.reminders_sent}, No-shows marked: ${data.no_shows_marked}`,
+        "success"
+      );
+      await fetchOutbox();
+      await loadSchedule();
+    }
+  } catch (err) {
+    console.error("Error setting clock:", err);
+  }
+}
+
+async function fetchOutbox() {
+  try {
+    const res = await fetch("/outbox?wrap=1");
+    const data = await res.json();
+    const items = data.outbox || (Array.isArray(data) ? data : []);
+    outboxBadge.textContent = `${items.length} outbox`;
+    outboxListCount.textContent = items.length;
+
+    if (items.length === 0) {
+      outboxMessagesContainer.innerHTML = `
+        <div class="p-6 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-xs">
+          Outbox is currently empty. Advance clock to morning (e.g. 08:00) to trigger reminders.
+        </div>
+      `;
+    } else {
+      outboxMessagesContainer.innerHTML = items
+        .map(
+          (m) => `
+        <div class="p-3 rounded-xl bg-white border border-slate-200 shadow-xs space-y-1 text-xs">
+          <div class="flex items-center justify-between text-[11px]">
+            <span class="font-bold text-slate-800 flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+              To: ${escapeHtml(m.recipient)} (${escapeHtml(m.patient_name || "Patient")})
+            </span>
+            <span class="font-mono text-slate-400 text-[10px]">${escapeHtml(m.sent_at || m.timestamp)}</span>
+          </div>
+          <p class="text-slate-700 bg-slate-50 p-2 rounded text-[11px] font-medium">${escapeHtml(m.message)}</p>
+          <div class="flex justify-between items-center pt-1 text-[10px] text-slate-400">
+            <span>Type: ${escapeHtml(m.type || "REMINDER")}</span>
+            <span>Apt #${m.appointment_id || "-"}</span>
+          </div>
+        </div>
+      `
+        )
+        .join("");
+    }
+  } catch (err) {
+    console.error("Error fetching outbox:", err);
+  }
 }
 
 // --- API CALLS ---
@@ -117,7 +246,7 @@ async function fetchSettings() {
     if (data.success) {
       state.policy.cutoff_hours = data.cancellation_cutoff_hours;
       state.policy.late_fee = data.late_cancellation_fee;
-      policySummaryEl.textContent = `Policy: ${state.policy.cutoff_hours}h Notice | $${state.policy.late_fee.toFixed(2)} Late Fee`;
+      policySummaryEl.textContent = `Policy: ${state.policy.cutoff_hours}h | $${state.policy.late_fee.toFixed(2)} Fee`;
       settingsCutoff.value = state.policy.cutoff_hours;
       settingsFee.value = state.policy.late_fee;
     }
@@ -150,13 +279,6 @@ async function fetchDoctors() {
 async function loadSchedule() {
   if (!state.selectedDoctorId) return;
 
-  timelineSlotsContainer.innerHTML = `
-    <div class="col-span-full py-12 text-center text-slate-400 animate-pulse">
-      <div class="inline-block w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mb-2"></div>
-      <p class="text-xs font-medium">Loading schedule...</p>
-    </div>
-  `;
-
   try {
     const res = await fetch(`/api/doctors/${state.selectedDoctorId}/day?date=${state.selectedDate}`);
     const data = await res.json();
@@ -167,6 +289,7 @@ async function loadSchedule() {
       scheduleHeaderSub.textContent = `Working Hours: ${data.working_hours} (${data.slot_duration_mins}-min slots)`;
 
       metricBooked.textContent = `${data.booked_count} Booked`;
+      metricNoshow.textContent = `${data.noshow_count || 0} No-Show`;
       metricCancelled.textContent = `${data.cancelled_count} Cancelled`;
 
       const availableCount = data.timeline.filter((s) => s.type === "AVAILABLE").length;
@@ -177,11 +300,6 @@ async function loadSchedule() {
     }
   } catch (err) {
     console.error("Error loading schedule:", err);
-    timelineSlotsContainer.innerHTML = `
-      <div class="col-span-full py-8 text-center text-rose-600 text-xs font-medium">
-        Failed to load schedule. Please try again.
-      </div>
-    `;
   }
 }
 
@@ -268,38 +386,75 @@ function renderTimeline(timeline) {
           duration: state.doctors.find((d) => d.id === state.selectedDoctorId)?.slot_duration_mins || 30,
         });
       });
-    } else if (slot.type === "BOOKED") {
+    } else {
+      // BOOKED, COMPLETED, or NO_SHOW
       const apt = slot.appointment;
-      card.className =
-        "slot-card p-3.5 rounded-xl border border-blue-200 bg-white shadow-xs flex flex-col justify-between";
+      const isCompleted = apt.status === "COMPLETED";
+      const isNoShow = apt.status === "NO_SHOW";
+      const isBooked = apt.status === "BOOKED";
+
+      let statusBadge = "";
+      if (isCompleted) {
+        statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">COMPLETED</span>';
+      } else if (isNoShow) {
+        statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">NO-SHOW</span>';
+      } else {
+        statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">CONFIRMED</span>';
+      }
+
+      const borderClass = isCompleted ? "border-emerald-200 bg-emerald-50/20" : isNoShow ? "border-amber-200 bg-amber-50/20" : "border-blue-200 bg-white";
+
+      card.className = `slot-card p-3.5 rounded-xl border ${borderClass} shadow-xs flex flex-col justify-between`;
       card.innerHTML = `
         <div>
           <div class="flex items-center justify-between mb-1.5">
-            <span class="text-xs font-extrabold text-blue-900">${slot.slot_start} - ${slot.slot_end}</span>
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">CONFIRMED</span>
+            <span class="text-xs font-extrabold text-slate-900">${slot.slot_start} - ${slot.slot_end}</span>
+            ${statusBadge}
           </div>
-          <div class="font-bold text-xs text-slate-900 truncate" title="${apt.patient_name}">${apt.patient_name}</div>
-          <div class="text-[11px] text-slate-500">${apt.patient_phone || "No phone"}</div>
+          <div class="font-bold text-xs text-slate-900 truncate" title="${escapeHtml(apt.patient_name)}">${escapeHtml(apt.patient_name)}</div>
+          <div class="text-[11px] text-slate-500">${escapeHtml(apt.patient_phone || "No phone")}</div>
           ${
             apt.notes
-              ? `<div class="mt-1 text-[11px] text-slate-600 bg-slate-50 rounded px-2 py-1 italic truncate" title="${apt.notes}">${apt.notes}</div>`
+              ? `<div class="mt-1 text-[11px] text-slate-600 bg-slate-50 rounded px-2 py-0.5 italic truncate" title="${escapeHtml(apt.notes)}">${escapeHtml(apt.notes)}</div>`
               : ""
           }
         </div>
-        <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
-          <button class="cancel-slot-btn text-[11px] font-semibold text-rose-600 hover:text-rose-800 flex items-center gap-1 transition" data-apt-id="${apt.id}">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            Cancel Visit
-          </button>
+        
+        <!-- Action Buttons -->
+        <div class="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-1 text-[11px]">
+          ${
+            isBooked
+              ? `
+            <div class="flex items-center gap-2">
+              <button class="complete-btn text-emerald-600 hover:text-emerald-800 font-semibold" data-apt-id="${apt.id}" title="Mark patient attended">Check-In</button>
+              <span class="text-slate-300">&bull;</span>
+              <button class="reschedule-btn text-blue-600 hover:text-blue-800 font-semibold" data-apt-id="${apt.id}">Reschedule</button>
+              <span class="text-slate-300">&bull;</span>
+              <button class="cancel-slot-btn text-rose-600 hover:text-rose-800 font-semibold" data-apt-id="${apt.id}">Cancel</button>
+            </div>
+            `
+              : `
+            <span class="text-[10px] text-slate-400 font-medium">Status: ${apt.status}</span>
+            `
+          }
           <span class="text-[10px] text-slate-400 font-mono">#${apt.id}</span>
         </div>
       `;
 
-      const cancelBtn = card.querySelector(".cancel-slot-btn");
-      cancelBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        openCancelModal(apt.id);
-      });
+      if (isBooked) {
+        card.querySelector(".complete-btn").addEventListener("click", (e) => {
+          e.stopPropagation();
+          markAppointmentCompleted(apt.id);
+        });
+        card.querySelector(".reschedule-btn").addEventListener("click", (e) => {
+          e.stopPropagation();
+          openRescheduleModal(apt);
+        });
+        card.querySelector(".cancel-slot-btn").addEventListener("click", (e) => {
+          e.stopPropagation();
+          openCancelModal(apt.id);
+        });
+      }
     }
 
     timelineSlotsContainer.appendChild(card);
@@ -329,10 +484,10 @@ function renderCancelledAppointments(cancelledListItems) {
 
     item.innerHTML = `
       <div>
-        <span class="font-bold text-slate-800">${apt.patient_name}</span>
+        <span class="font-bold text-slate-800">${escapeHtml(apt.patient_name)}</span>
         <span class="text-slate-400 mx-1">&bull;</span>
         <span class="text-slate-600 font-medium">${apt.start_time.split(" ")[1]} - ${apt.end_time.split(" ")[1]}</span>
-        <span class="text-slate-400 text-[11px] ml-2">Reason: ${apt.cancellation_reason || "None specified"}</span>
+        <span class="text-slate-400 text-[11px] ml-2">Reason: ${escapeHtml(apt.cancellation_reason || "None specified")}</span>
       </div>
       <div class="flex items-center gap-2">
         ${feeBadge}
@@ -386,6 +541,84 @@ function renderDoctorsDirectory() {
 
     doctorsGrid.appendChild(card);
   });
+}
+
+// --- LEVEL 1 (T6): RESCHEDULE MODAL LOGIC ---
+function openRescheduleModal(apt) {
+  rescheduleApptId.value = apt.id;
+  reschedulePatientName.textContent = apt.patient_name;
+  rescheduleDoctorName.textContent = `${apt.doctor_name} (${apt.doctor_specialty})`;
+  rescheduleCurrentTime.textContent = `${apt.start_time} - ${apt.end_time.split(" ")[1]}`;
+
+  const currentParts = apt.start_time.split(" ");
+  rescheduleDateInput.value = currentParts[0];
+  rescheduleTimeInput.value = currentParts[1];
+  rescheduleDuration.value = 30;
+
+  rescheduleErrorBox.classList.add("hidden");
+  modalReschedule.classList.remove("hidden");
+}
+
+function closeRescheduleModal() {
+  modalReschedule.classList.add("hidden");
+}
+
+async function handleRescheduleSubmit(e) {
+  e.preventDefault();
+  rescheduleErrorBox.classList.add("hidden");
+
+  const apptId = rescheduleApptId.value;
+  const newDate = rescheduleDateInput.value;
+  const newTime = rescheduleTimeInput.value;
+  const duration = parseInt(rescheduleDuration.value) || 30;
+  const newStartStr = `${newDate} ${newTime}`;
+
+  try {
+    const res = await fetch(`/appointments/${apptId}/reschedule`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        start_time: newStartStr,
+        duration_mins: duration,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      rescheduleErrorBox.classList.remove("hidden");
+      rescheduleErrorMessage.textContent = data.error || "Could not reschedule appointment.";
+      return;
+    }
+
+    closeRescheduleModal();
+    showToast(data.message || "Appointment successfully rescheduled!", "success");
+    state.selectedDate = newDate;
+    scheduleDatePicker.value = newDate;
+    loadSchedule();
+  } catch (err) {
+    console.error("Reschedule error:", err);
+    rescheduleErrorBox.classList.remove("hidden");
+    rescheduleErrorMessage.textContent = "A server error occurred. Please try again.";
+  }
+}
+
+// --- COMPLETION ACTION ---
+async function markAppointmentCompleted(apptId) {
+  try {
+    const res = await fetch(`/appointments/${apptId}/complete`, {
+      method: "POST",
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast("Appointment marked as attended & completed.", "success");
+      loadSchedule();
+    } else {
+      showToast(data.error || "Could not complete appointment", "error");
+    }
+  } catch (err) {
+    console.error("Error marking completed:", err);
+  }
 }
 
 // --- BOOKING MODAL LOGIC ---
@@ -451,13 +684,11 @@ async function handleBookingSubmit(e) {
     const data = await res.json();
 
     if (!res.ok || !data.success) {
-      // Conflict or validation error!
       bookErrorBox.classList.remove("hidden");
       bookErrorMessage.innerHTML = data.error || "Could not book appointment.";
       return;
     }
 
-    // Success!
     closeBookingModal();
     showToast(`Appointment booked successfully for ${patientName}!`, "success");
     state.selectedDate = dateVal;
@@ -498,7 +729,6 @@ async function openCancelModal(appointmentId) {
     cancelModalTime.textContent = `${data.start_time} (${data.hours_notice}h notice)`;
 
     if (data.is_late) {
-      // Late cancellation: fee applies!
       cancelPolicyBox.className =
         "p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-900 text-xs space-y-1";
       cancelPolicyBox.innerHTML = `
@@ -507,7 +737,7 @@ async function openCancelModal(appointmentId) {
           Late Cancellation Policy Applied
         </div>
         <p class="font-medium text-rose-800">
-          Cancellation is within ${data.cutoff_hours} hours of the appointment (${data.hours_notice}h notice).
+          Notice is within ${data.cutoff_hours} hours of the appointment (${data.hours_notice}h notice).
         </p>
         <div class="mt-2 pt-2 border-t border-rose-200 flex justify-between items-center font-extrabold text-sm text-rose-900">
           <span>Fee Incurred:</span>
@@ -519,7 +749,6 @@ async function openCancelModal(appointmentId) {
         "px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold transition";
       confirmCancelBtn.textContent = `Confirm Cancellation ($${data.fee.toFixed(2)} Fee)`;
     } else {
-      // Good time cancellation: Free!
       cancelPolicyBox.className =
         "p-3.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-xs space-y-1";
       cancelPolicyBox.innerHTML = `
@@ -631,10 +860,6 @@ async function performPatientSearch() {
   }
 }
 
-function escapeHtml(str) {
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
 function renderSearchResults(patientsList) {
   searchResultsContainer.innerHTML = "";
 
@@ -651,15 +876,24 @@ function renderSearchResults(patientsList) {
       aptsHtml = apts
         .map((apt) => {
           let badge = "";
-          let cancelBtn = "";
+          let actions = "";
 
           if (apt.status === "BOOKED") {
             badge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">CONFIRMED</span>';
-            cancelBtn = `
+            actions = `
+              <button class="search-reschedule-btn text-xs font-semibold text-blue-600 hover:text-blue-800 transition mr-2" data-apt='${JSON.stringify(
+                apt
+              )}'>
+                Reschedule
+              </button>
               <button class="search-cancel-btn text-xs font-semibold text-rose-600 hover:text-rose-800 transition" data-apt-id="${apt.id}">
                 Cancel
               </button>
             `;
+          } else if (apt.status === "COMPLETED") {
+            badge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">COMPLETED</span>';
+          } else if (apt.status === "NO_SHOW") {
+            badge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">NO-SHOW</span>';
           } else if (apt.status === "CANCELLED") {
             const feeInfo =
               apt.cancellation_fee > 0
@@ -668,20 +902,18 @@ function renderSearchResults(patientsList) {
                 ? "Fee Waived"
                 : "Free";
             badge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">CANCELLED (${feeInfo})</span>`;
-          } else {
-            badge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">${apt.status}</span>`;
           }
 
           return `
             <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
               <div>
-                <div class="font-bold text-slate-900">${apt.doctor_name} (${apt.doctor_specialty})</div>
+                <div class="font-bold text-slate-900">${escapeHtml(apt.doctor_name)} (${escapeHtml(apt.doctor_specialty)})</div>
                 <div class="text-slate-500 font-medium">${apt.start_time} - ${apt.end_time.split(" ")[1]}</div>
                 ${apt.notes ? `<div class="text-slate-400 italic text-[11px]">${escapeHtml(apt.notes)}</div>` : ""}
               </div>
               <div class="flex items-center gap-3">
                 ${badge}
-                ${cancelBtn}
+                ${actions}
               </div>
             </div>
           `;
@@ -721,11 +953,11 @@ function renderSearchResults(patientsList) {
       </div>
     `;
 
-    // Attach cancel events
     card.querySelectorAll(".search-cancel-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        openCancelModal(btn.dataset.aptId);
-      });
+      btn.addEventListener("click", () => openCancelModal(btn.dataset.aptId));
+    });
+    card.querySelectorAll(".search-reschedule-btn").forEach((btn) => {
+      btn.addEventListener("click", () => openRescheduleModal(JSON.parse(btn.dataset.apt)));
     });
 
     searchResultsContainer.appendChild(card);
@@ -767,25 +999,23 @@ function switchTab(tabId) {
 
 // --- EVENT LISTENERS ---
 function setupEventListeners() {
-  // Tabs
   document.getElementById("tab-schedule-btn").addEventListener("click", () => switchTab("schedule"));
   document.getElementById("tab-search-btn").addEventListener("click", () => switchTab("search"));
   document.getElementById("tab-doctors-btn").addEventListener("click", () => switchTab("doctors"));
 
-  // Date Navigation
   scheduleDatePicker.addEventListener("change", (e) => {
     state.selectedDate = e.target.value;
     loadSchedule();
   });
 
   document.getElementById("today-btn").addEventListener("click", () => {
-    state.selectedDate = new Date().toISOString().split("T")[0];
+    state.selectedDate = (state.simulatedClock || new Date()).toISOString().split("T")[0];
     scheduleDatePicker.value = state.selectedDate;
     loadSchedule();
   });
 
   document.getElementById("tomorrow-btn").addEventListener("click", () => {
-    const tmrw = new Date();
+    const tmrw = new Date(state.simulatedClock || new Date());
     tmrw.setDate(tmrw.getDate() + 1);
     state.selectedDate = tmrw.toISOString().split("T")[0];
     scheduleDatePicker.value = state.selectedDate;
@@ -808,18 +1038,16 @@ function setupEventListeners() {
     loadSchedule();
   });
 
-  // Book Modal Triggers
+  // Book Modal
   document.getElementById("header-book-btn").addEventListener("click", () => openBookingModal());
   document.getElementById("close-book-modal-btn").addEventListener("click", closeBookingModal);
   document.getElementById("cancel-book-modal-btn").addEventListener("click", closeBookingModal);
   bookForm.addEventListener("submit", handleBookingSubmit);
 
-  // Duration Buttons in Booking Modal
   document.querySelectorAll(".duration-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".duration-btn").forEach((b) => {
-        b.className =
-          "duration-btn py-1.5 rounded-lg border border-slate-200 text-center font-medium hover:bg-slate-50";
+        b.className = "duration-btn py-1.5 rounded-lg border border-slate-200 text-center font-medium hover:bg-slate-50";
       });
       btn.className =
         "duration-btn active-duration py-1.5 rounded-lg border border-blue-600 bg-blue-50 text-blue-700 text-center font-semibold";
@@ -827,12 +1055,66 @@ function setupEventListeners() {
     });
   });
 
-  // Cancel Modal Triggers
+  // Reschedule Modal (Level 1 - T6)
+  document.getElementById("close-reschedule-modal-btn").addEventListener("click", closeRescheduleModal);
+  document.getElementById("abort-reschedule-btn").addEventListener("click", closeRescheduleModal);
+  rescheduleForm.addEventListener("submit", handleRescheduleSubmit);
+
+  document.querySelectorAll(".reschedule-duration-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".reschedule-duration-btn").forEach((b) => {
+        b.className =
+          "reschedule-duration-btn py-1.5 rounded-lg border border-slate-200 text-center font-medium hover:bg-slate-50";
+      });
+      btn.className =
+        "reschedule-duration-btn active-duration py-1.5 rounded-lg border border-blue-600 bg-blue-50 text-blue-700 text-center font-semibold";
+      rescheduleDuration.value = btn.dataset.rescheduleDuration;
+    });
+  });
+
+  // Clock Modal (Level 2 & 3 Simulator)
+  document.getElementById("open-clock-btn").addEventListener("click", async () => {
+    await fetchClock();
+    await fetchOutbox();
+    modalClock.classList.remove("hidden");
+  });
+  document.getElementById("close-clock-modal-btn").addEventListener("click", () => {
+    modalClock.classList.add("hidden");
+  });
+
+  document.querySelectorAll(".quick-advance-btn").forEach((btn) => {
+    btn.addEventListener("click", () => advanceClock(parseInt(btn.dataset.advance)));
+  });
+
+  document.getElementById("morning-trigger-btn").addEventListener("click", () => {
+    const d = state.simulatedClock ? new Date(state.simulatedClock) : new Date();
+    const datePart = d.toISOString().split("T")[0];
+    setClockTime(`${datePart}T08:00:00`);
+  });
+
+  customClockForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const val = customClockInput.value;
+    if (val) {
+      setClockTime(val);
+    }
+  });
+
+  document.getElementById("clear-outbox-btn").addEventListener("click", async () => {
+    try {
+      await fetch("/outbox/clear", { method: "POST" });
+      await fetchOutbox();
+      showToast("Outbox cleared.", "info");
+    } catch (err) {
+      console.error("Error clearing outbox:", err);
+    }
+  });
+
+  // Cancel Modal
   document.getElementById("close-cancel-modal-btn").addEventListener("click", closeCancelModal);
   document.getElementById("abort-cancel-btn").addEventListener("click", closeCancelModal);
   cancelForm.addEventListener("submit", handleCancelSubmit);
 
-  // Waiver toggle
   cancelWaiveCheckbox.addEventListener("change", (e) => {
     cancelWaiverReasonBlock.classList.toggle("hidden", !e.target.checked);
     if (e.target.checked) {
@@ -846,7 +1128,7 @@ function setupEventListeners() {
     }
   });
 
-  // Settings Modal Triggers
+  // Settings Modal
   document.getElementById("open-settings-btn").addEventListener("click", () => {
     modalSettings.classList.remove("hidden");
   });
@@ -874,7 +1156,7 @@ function setupEventListeners() {
       if (data.success) {
         state.policy.cutoff_hours = data.cancellation_cutoff_hours;
         state.policy.late_fee = data.late_cancellation_fee;
-        policySummaryEl.textContent = `Policy: ${state.policy.cutoff_hours}h Notice | $${state.policy.late_fee.toFixed(2)} Late Fee`;
+        policySummaryEl.textContent = `Policy: ${state.policy.cutoff_hours}h | $${state.policy.late_fee.toFixed(2)} Fee`;
         modalSettings.classList.add("hidden");
         showToast("Clinic policy updated successfully!", "success");
       }
@@ -883,7 +1165,7 @@ function setupEventListeners() {
     }
   });
 
-  // Add Doctor Modal Triggers
+  // Add Doctor Modal
   document.getElementById("add-doctor-modal-btn").addEventListener("click", () => {
     addDoctorForm.reset();
     modalAddDoctor.classList.remove("hidden");
@@ -927,7 +1209,7 @@ function setupEventListeners() {
     }
   });
 
-  // Patient Search Input
+  // Search
   patientSearchInput.addEventListener("input", handlePatientSearchInput);
   clearSearchBtn.addEventListener("click", () => {
     patientSearchInput.value = "";
@@ -935,5 +1217,4 @@ function setupEventListeners() {
   });
 }
 
-// Start
 document.addEventListener("DOMContentLoaded", initApp);

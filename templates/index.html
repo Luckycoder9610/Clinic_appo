@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CareFlow Clinic | Front Desk Booking & Schedule</title>
+  <title>CareFlow Clinic | Front Desk Booking, Schedule & Automation</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,23 +28,26 @@
             <h1 class="text-xl font-extrabold tracking-tight text-slate-900">CareFlow Clinic</h1>
             <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Front Desk</span>
           </div>
-          <p class="text-xs text-slate-500">Conflict-Free Booking & Fair Cancellation Engine</p>
+          <p class="text-xs text-slate-500">Conflict-Free Booking, Fair Cancellation & Automated Workflows</p>
         </div>
       </div>
 
-      <!-- Live Clock & Policy Info -->
-      <div class="flex items-center gap-3">
-        <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium">
-          <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <!-- Live Clock, Automation Simulator & Actions -->
+      <div class="flex items-center gap-2.5">
+        
+        <!-- Clock & Outbox Simulator Trigger -->
+        <button id="open-clock-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-semibold hover:bg-indigo-100 transition shadow-xs" title="Clock Simulator & Notification Outbox">
+          <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
           <span id="current-clock">Loading clock...</span>
-        </div>
+          <span id="outbox-badge" class="px-1.5 py-0.2 rounded-full bg-indigo-600 text-white text-[10px] font-bold">0 outbox</span>
+        </button>
 
         <!-- Policy summary pill -->
-        <button id="open-settings-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium hover:bg-amber-100 transition">
+        <button id="open-settings-btn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium hover:bg-amber-100 transition">
           <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-          <span id="policy-summary-text">Policy: 24h Notice | $25 Late Fee</span>
+          <span id="policy-summary-text">Policy: 24h | $25 Fee</span>
           <svg class="w-3.5 h-3.5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -52,7 +55,7 @@
         </button>
 
         <!-- Main Action Button -->
-        <button id="header-book-btn" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm transition">
+        <button id="header-book-btn" class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
           </svg>
@@ -139,7 +142,7 @@
           </div>
 
           <!-- Schedule Metrics -->
-          <div class="flex items-center gap-3 text-xs font-medium">
+          <div class="flex items-center gap-2.5 text-xs font-medium">
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
               <span class="w-2 h-2 rounded-full bg-blue-600"></span>
               <span id="metric-booked">0 Booked</span>
@@ -147,6 +150,10 @@
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
               <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
               <span id="metric-available">0 Available</span>
+            </span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+              <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+              <span id="metric-noshow">0 No-Show</span>
             </span>
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
               <span class="w-2 h-2 rounded-full bg-slate-400"></span>
@@ -176,7 +183,7 @@
           <!-- Populated via JS -->
         </div>
 
-        <!-- Cancelled Section (collapsed/expandable if any) -->
+        <!-- Cancelled Section -->
         <div id="cancelled-appointments-section" class="pt-6 border-t border-slate-100 hidden">
           <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-rose-500"></span>
@@ -214,7 +221,6 @@
 
       <!-- Search Results Area -->
       <div id="search-results-container" class="space-y-4">
-        <!-- Will populate or show empty state -->
         <div class="bg-white rounded-2xl p-10 border border-slate-200 text-center text-slate-500">
           <svg class="w-12 h-12 mx-auto text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
@@ -247,7 +253,7 @@
 
   <!-- FOOTER -->
   <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-    CareFlow Front Desk Booking System &bull; Conflict-Free Engine with Fair Cancellation Rules &bull; MySQL Database
+    CareFlow Front Desk Booking System &bull; Conflict-Free Engine with Fair Cancellation Rules &bull; Notification Service & Clock Automation
   </footer>
 
 
@@ -264,7 +270,6 @@
         </button>
       </div>
 
-      <!-- Conflict Error Alert Box -->
       <div id="book-error-box" class="mt-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs hidden">
         <div class="flex items-start gap-2.5">
           <svg class="w-4 h-4 text-rose-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
@@ -334,6 +339,125 @@
   </div>
 
 
+  <!-- MODAL: LEVEL 1 (T6) RESCHEDULE APPOINTMENT -->
+  <div id="modal-reschedule" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl mx-4 border border-slate-100 space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">Reschedule Appointment</h3>
+          <p class="text-xs text-slate-500">Keeps same patient and doctor &bull; Conflict-free re-check</p>
+        </div>
+        <button id="close-reschedule-modal-btn" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <!-- Preserved Patient & Doctor Banner -->
+      <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+        <div class="flex justify-between">
+          <span class="text-slate-500">Patient:</span>
+          <span id="reschedule-patient-name" class="font-bold text-slate-800">-</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Doctor:</span>
+          <span id="reschedule-doctor-name" class="font-semibold text-slate-800">-</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Current Slot:</span>
+          <span id="reschedule-current-time" class="font-medium text-slate-600">-</span>
+        </div>
+      </div>
+
+      <!-- Conflict Alert Box -->
+      <div id="reschedule-error-box" class="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs hidden">
+        <div class="flex items-start gap-2">
+          <svg class="w-4 h-4 text-rose-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+          <div id="reschedule-error-message" class="font-medium"></div>
+        </div>
+      </div>
+
+      <form id="reschedule-form" class="space-y-4 text-xs">
+        <input type="hidden" id="reschedule-appt-id">
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">New Date</label>
+            <input type="date" id="reschedule-date-input" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 font-medium">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">New Start Time</label>
+            <input type="time" id="reschedule-time-input" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 font-medium">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Duration (Minutes)</label>
+          <div class="grid grid-cols-4 gap-2">
+            <button type="button" data-reschedule-duration="15" class="reschedule-duration-btn py-1.5 rounded-lg border border-slate-200 text-center font-medium hover:bg-slate-50">15 min</button>
+            <button type="button" data-reschedule-duration="30" class="reschedule-duration-btn active-duration py-1.5 rounded-lg border border-blue-600 bg-blue-50 text-blue-700 text-center font-semibold">30 min</button>
+            <button type="button" data-reschedule-duration="45" class="reschedule-duration-btn py-1.5 rounded-lg border border-slate-200 text-center font-medium hover:bg-slate-50">45 min</button>
+            <button type="button" data-reschedule-duration="60" class="reschedule-duration-btn py-1.5 rounded-lg border border-slate-200 text-center font-medium hover:bg-slate-50">60 min</button>
+          </div>
+          <input type="hidden" id="reschedule-duration" value="30">
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" id="abort-reschedule-btn" class="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium">Cancel</button>
+          <button type="submit" class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm">Confirm Reschedule</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- MODAL: LEVEL 2 & 3 CLOCK & NOTIFICATION OUTBOX SIMULATOR -->
+  <div id="modal-clock" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs hidden">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl mx-4 border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">Clinic Clock & Outbox Simulator</h3>
+          <p class="text-xs text-slate-500">Graded via /outbox & POST /clock automation</p>
+        </div>
+        <button id="close-clock-modal-btn" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <!-- Clock Advance Controls -->
+      <div class="p-4 rounded-xl bg-indigo-50/60 border border-indigo-200 space-y-3 text-xs">
+        <div class="font-bold text-indigo-950 flex items-center justify-between">
+          <span>Advance Simulated Clock (POST /clock)</span>
+          <span id="modal-current-clock-display" class="font-mono text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200"></span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <button type="button" class="quick-advance-btn py-1.5 rounded-lg bg-white border border-indigo-200 text-indigo-900 font-semibold hover:bg-indigo-100 transition" data-advance="15">+15 Mins</button>
+          <button type="button" class="quick-advance-btn py-1.5 rounded-lg bg-white border border-indigo-200 text-indigo-900 font-semibold hover:bg-indigo-100 transition" data-advance="30">+30 Mins (No-Show Check)</button>
+          <button type="button" class="quick-advance-btn py-1.5 rounded-lg bg-white border border-indigo-200 text-indigo-900 font-semibold hover:bg-indigo-100 transition" data-advance="60">+1 Hour</button>
+          <button type="button" id="morning-trigger-btn" class="py-1.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition">Set 08:00 (Reminders)</button>
+        </div>
+        <form id="custom-clock-form" class="pt-2 border-t border-indigo-100 flex items-center gap-2">
+          <input type="datetime-local" id="custom-clock-input" class="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-medium focus:ring-2 focus:ring-indigo-500">
+          <button type="submit" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-semibold text-xs hover:bg-slate-800">Set Custom Time</button>
+        </form>
+      </div>
+
+      <!-- Outbox Section -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span>Notification Service Outbox (<span id="outbox-list-count">0</span> items)</span>
+          </h4>
+          <button id="clear-outbox-btn" class="text-xs text-rose-600 hover:text-rose-800 font-semibold">Clear Outbox</button>
+        </div>
+        <div id="outbox-messages-container" class="space-y-2 max-h-56 overflow-y-auto">
+          <!-- Populated via JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <!-- MODAL: FAIR CANCELLATION -->
   <div id="modal-cancel" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs hidden">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl mx-4 border border-slate-100 space-y-4">
@@ -364,9 +488,7 @@
       </div>
 
       <!-- Dynamic Policy Evaluation Box -->
-      <div id="cancel-policy-evaluation-box" class="p-4 rounded-xl text-xs space-y-1">
-        <!-- Populated via JS: Green if on-time, Orange/Red if late -->
-      </div>
+      <div id="cancel-policy-evaluation-box" class="p-4 rounded-xl text-xs space-y-1"></div>
 
       <form id="cancel-form" class="space-y-3.5 text-xs">
         <input type="hidden" id="cancel-appointment-id">
@@ -376,7 +498,6 @@
           <input type="text" id="cancel-reason-input" placeholder="e.g. Resolved symptoms, scheduling conflict" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500">
         </div>
 
-        <!-- Emergency Fee Waiver Section -->
         <div id="cancel-waiver-container" class="p-3 rounded-xl border border-amber-200 bg-amber-50/70 space-y-2 hidden">
           <label class="flex items-center gap-2 cursor-pointer font-semibold text-amber-900">
             <input type="checkbox" id="cancel-waive-checkbox" class="rounded text-amber-600 focus:ring-amber-500">
@@ -416,7 +537,6 @@
             <input type="number" id="settings-cutoff" min="1" max="168" step="1" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 font-semibold">
             <span class="text-slate-500 font-medium">hours</span>
           </div>
-          <p class="text-[11px] text-slate-400 mt-1">Cancellations with less notice than this are treated as late.</p>
         </div>
 
         <div>

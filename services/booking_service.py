@@ -1,7 +1,7 @@
 from datetime import datetime, date, time, timedelta
 from typing import Optional, Dict, Any, List, Tuple
 from sqlalchemy import and_, or_
-from models import db, Doctor, Patient, Appointment, ClinicSetting
+from models import db, Doctor, Patient, Appointment, NotificationOutbox, ClinicSetting
 from config import Config
 
 
@@ -40,11 +40,9 @@ class BookingService:
             query = query.filter(Appointment.id != exclude_appointment_id)
 
         if lock_for_update:
-            # Prevent race conditions during concurrent bookings
             try:
                 query = query.with_for_update()
             except Exception:
-                # Some dialects (like SQLite in certain modes) do not support with_for_update
                 pass
 
         return query.first()
@@ -59,14 +57,10 @@ class BookingService:
         patient_email: Optional[str] = None,
         notes: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Atomically books an appointment for a doctor and patient.
-        Ensures strict conflict-free validation.
-        """
+        """Atomically books an appointment for a doctor and patient."""
         if start_time >= end_time:
             return {"success": False, "error": "Start time must be before end time."}
 
-        # Check doctor existence & active status
         doctor = db.session.get(Doctor, doctor_id)
         if not doctor:
             return {"success": False, "error": "Doctor not found."}
@@ -74,7 +68,6 @@ class BookingService:
         if not doctor.is_active:
             return {"success": False, "error": f"{doc_name} is currently inactive."}
 
-        # Check doctor working hours
         shift_start_time = doctor.shift_start or time(9, 0)
         shift_end_time = doctor.shift_end or time(17, 0)
         slot_start_time = start_time.time()
@@ -87,7 +80,6 @@ class BookingService:
                 f"falls outside {doc_name}'s working hours ({shift_start_time.strftime('%H:%M')} - {shift_end_time.strftime('%H:%M')}).",
             }
 
-        # Concurrency-safe overlap check
         conflict = BookingService.check_conflict(
             doctor_id=doctor_id,
             start_time=start_time,
@@ -106,7 +98,6 @@ class BookingService:
                 "conflicting_appointment_id": conflict.id,
             }
 
-        # Find or create patient
         patient = Patient.query.filter_by(phone=patient_phone.strip()).first()
         if not patient:
             patient = Patient(
@@ -117,13 +108,11 @@ class BookingService:
             db.session.add(patient)
             db.session.flush()
         else:
-            # Update name/email if provided
             if patient_name and patient.name != patient_name.strip():
                 patient.name = patient_name.strip()
             if patient_email and patient.email != patient_email.strip():
                 patient.email = patient_email.strip()
 
-        # Create appointment
         appointment = Appointment(
             doctor_id=doctor_id,
             patient_id=patient.id,
@@ -141,6 +130,253 @@ class BookingService:
             "appointment": appointment.to_dict(),
         }
 
+    # =========================================================================
+    # LEVEL 1 — T6 (LIFECYCLE): RESCHEDULING AN APPOINTMENT
+    # =========================================================================
+    @staticmethod
+    def reschedule_appointment(
+        appointment_id: int,
+        new_start_time: datetime,
+        new_end_time: Optional[datetime] = None,
+        duration_mins: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Reschedules an appointment to a new time.
+        Invariants:
+        1. Keeps the EXACT same patient and doctor.
+        2. Must stay conflict-free (re-checks overlap excluding this appointment).
+        3. Enforces doctor shift working hours.
+        """
+        appointment = db.session.get(Appointment, appointment_id)
+        if not appointment:
+            return {"success": False, "error": "Appointment not found."}
+
+        if appointment.status != "BOOKED":
+            return {
+                "success": False,
+                "error": f"Only booked appointments can be rescheduled. Current status: {appointment.status}.",
+            }
+
+        doctor = db.session.get(Doctor, appointment.doctor_id)
+        if not doctor:
+            return {"success": False, "error": "Doctor not found."}
+        doc_name = doctor.name if doctor.name.startswith("Dr.") else f"Dr. {doctor.name}"
+
+        # Calculate new_end_time
+        if new_end_time is None:
+            if duration_mins:
+                new_end_time = new_start_time + timedelta(minutes=int(duration_mins))
+            else:
+                original_duration = appointment.end_time - appointment.start_time
+                new_end_time = new_start_time + original_duration
+
+        if new_start_time >= new_end_time:
+            return {"success": False, "error": "New start time must be before new end time."}
+
+        # Validate doctor working hours
+        shift_start_time = doctor.shift_start or time(9, 0)
+        shift_end_time = doctor.shift_end or time(17, 0)
+        slot_start_time = new_start_time.time()
+        slot_end_time = new_end_time.time()
+
+        if slot_start_time < shift_start_time or slot_end_time > shift_end_time:
+            return {
+                "success": False,
+                "error": f"Rescheduled time ({new_start_time.strftime('%H:%M')} - {new_end_time.strftime('%H:%M')}) "
+                f"falls outside {doc_name}'s working hours ({shift_start_time.strftime('%H:%M')} - {shift_end_time.strftime('%H:%M')}).",
+            }
+
+        # Concurrency-safe overlap check excluding this appointment
+        conflict = BookingService.check_conflict(
+            doctor_id=appointment.doctor_id,
+            start_time=new_start_time,
+            end_time=new_end_time,
+            exclude_appointment_id=appointment.id,
+            lock_for_update=True,
+        )
+
+        if conflict:
+            conflicting_patient = conflict.patient.name if conflict.patient else "Another patient"
+            return {
+                "success": False,
+                "conflict": True,
+                "error": f"Slot conflict! Cannot reschedule: {doc_name} already has an appointment booked from "
+                f"{conflict.start_time.strftime('%H:%M')} to {conflict.end_time.strftime('%H:%M')} "
+                f"(Patient: {conflicting_patient}).",
+                "conflicting_appointment_id": conflict.id,
+            }
+
+        # If date changes, reset reminder_sent so patient can receive reminder for new date
+        if new_start_time.date() != appointment.start_time.date():
+            appointment.reminder_sent = False
+            appointment.reminder_sent_at = None
+
+        appointment.start_time = new_start_time
+        appointment.end_time = new_end_time
+        db.session.commit()
+
+        return {
+            "success": True,
+            "message": f"Appointment successfully rescheduled to {new_start_time.strftime('%Y-%m-%d %H:%M')}.",
+            "appointment": appointment.to_dict(),
+        }
+
+    # =========================================================================
+    # COMPLETION
+    # =========================================================================
+    @staticmethod
+    def mark_completed(appointment_id: int) -> Dict[str, Any]:
+        """Marks an appointment as COMPLETED when the patient attends the visit."""
+        appointment = db.session.get(Appointment, appointment_id)
+        if not appointment:
+            return {"success": False, "error": "Appointment not found."}
+
+        if appointment.status != "BOOKED":
+            return {
+                "success": False,
+                "error": f"Cannot mark appointment as completed. Current status: {appointment.status}.",
+            }
+
+        appointment.status = "COMPLETED"
+        appointment.completed_at = datetime.now()
+        db.session.commit()
+
+        return {
+            "success": True,
+            "message": "Appointment marked as completed.",
+            "appointment": appointment.to_dict(),
+        }
+
+    # =========================================================================
+    # LEVEL 2 & 3: CLOCK, MORNING REMINDERS & AUTO NO-SHOWS
+    # =========================================================================
+    @staticmethod
+    def get_simulated_clock() -> datetime:
+        """Returns the current simulated clock time, or now() if not set."""
+        val = ClinicSetting.get_val("simulated_clock")
+        if val:
+            try:
+                return datetime.fromisoformat(val)
+            except Exception:
+                pass
+        return datetime.now()
+
+    @staticmethod
+    def set_simulated_clock(clock_time: datetime) -> Dict[str, Any]:
+        """
+        Sets the clinic clock and executes automated morning reminders & no-show detection.
+        """
+        ClinicSetting.set_val("simulated_clock", clock_time.isoformat(), "Simulated clock timestamp")
+
+        # Level 2 (T1): Trigger morning reminders for today's appointments
+        reminders_count = BookingService.trigger_morning_reminders(clock_time)
+
+        # Level 3 (T2): Trigger auto-marking no-shows (30 min after start)
+        no_shows_count = BookingService.trigger_auto_no_shows(clock_time)
+
+        return {
+            "success": True,
+            "clock": clock_time.isoformat(),
+            "clock_formatted": clock_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "reminders_sent": reminders_count,
+            "no_shows_marked": no_shows_count,
+        }
+
+    @staticmethod
+    def trigger_morning_reminders(current_time: datetime) -> int:
+        """
+        Level 2 — T1: Each morning, remind patients of today's appointments via Notification Service outbox.
+        """
+        target_date = current_time.date()
+        day_start = datetime.combine(target_date, time(0, 0, 0))
+        day_end = datetime.combine(target_date, time(23, 59, 59))
+
+        # Find all active appointments today that have NOT yet received a reminder
+        todays_appointments = (
+            Appointment.query.filter(
+                Appointment.status == "BOOKED",
+                Appointment.start_time >= day_start,
+                Appointment.start_time <= day_end,
+                Appointment.reminder_sent == False,
+            )
+            .all()
+        )
+
+        sent_count = 0
+        for apt in todays_appointments:
+            doctor = apt.doctor
+            doc_name = doctor.name if doctor and doctor.name.startswith("Dr.") else f"Dr. {doctor.name if doctor else 'Physician'}"
+            patient = apt.patient
+            pat_name = patient.name if patient else "Patient"
+            recipient = patient.phone if (patient and patient.phone) else (patient.email if patient else "Patient")
+
+            msg_text = (
+                f"Reminder: Hello {pat_name}, you have an appointment today at "
+                f"{apt.start_time.strftime('%H:%M')} with {doc_name}."
+            )
+
+            outbox_entry = NotificationOutbox(
+                appointment_id=apt.id,
+                patient_id=apt.patient_id,
+                patient_name=pat_name,
+                recipient=recipient,
+                message=msg_text,
+                notification_type="REMINDER",
+                sent_at=current_time,
+            )
+            db.session.add(outbox_entry)
+            apt.reminder_sent = True
+            apt.reminder_sent_at = current_time
+            sent_count += 1
+
+        if sent_count > 0:
+            db.session.commit()
+
+        return sent_count
+
+    @staticmethod
+    def trigger_auto_no_shows(current_time: datetime) -> int:
+        """
+        Level 3 — T2: Auto-mark appointments as no-show 30 min after their start if not completed.
+        """
+        # Threshold: start_time + 30m <= current_time => start_time <= current_time - 30m
+        threshold_time = current_time - timedelta(minutes=30)
+
+        unattended = (
+            Appointment.query.filter(
+                Appointment.status == "BOOKED",
+                Appointment.start_time <= threshold_time,
+            )
+            .all()
+        )
+
+        marked_count = 0
+        for apt in unattended:
+            apt.status = "NO_SHOW"
+            apt.no_show_at = current_time
+            marked_count += 1
+
+        if marked_count > 0:
+            db.session.commit()
+
+        return marked_count
+
+    @staticmethod
+    def get_outbox() -> List[Dict[str, Any]]:
+        """Retrieves all notifications in the notification outbox."""
+        entries = NotificationOutbox.query.order_by(NotificationOutbox.id.asc()).all()
+        return [e.to_dict() for e in entries]
+
+    @staticmethod
+    def clear_outbox() -> int:
+        """Clears all outbox entries (useful for testing)."""
+        count = NotificationOutbox.query.delete()
+        db.session.commit()
+        return count
+
+    # =========================================================================
+    # CANCELLATION & PREVIEW
+    # =========================================================================
     @staticmethod
     def preview_cancellation(
         appointment_id: int,
@@ -158,9 +394,8 @@ class BookingService:
             }
 
         cutoff_hours, late_fee = BookingService.get_cancellation_policy()
-        cancel_dt = cancellation_time or datetime.now()
+        cancel_dt = cancellation_time or BookingService.get_simulated_clock()
 
-        # Calculate difference in hours between cancellation request and appointment start
         delta = appointment.start_time - cancel_dt
         hours_notice = delta.total_seconds() / 3600.0
 
@@ -194,9 +429,7 @@ class BookingService:
         waiver_reason: Optional[str] = None,
         reason: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Cancels an appointment, enforces late fee policy, and immediately frees the time slot.
-        """
+        """Cancels an appointment, enforces late fee policy, and frees slot."""
         appointment = db.session.get(Appointment, appointment_id)
         if not appointment:
             return {"success": False, "error": "Appointment not found."}
@@ -207,7 +440,7 @@ class BookingService:
                 "error": f"Appointment cannot be cancelled because it is {appointment.status.lower()}.",
             }
 
-        cancel_dt = cancellation_time or datetime.now()
+        cancel_dt = cancellation_time or BookingService.get_simulated_clock()
         preview = BookingService.preview_cancellation(appointment_id, cancellation_time=cancel_dt)
         if not preview["success"]:
             return preview
@@ -243,12 +476,7 @@ class BookingService:
 
     @staticmethod
     def get_doctor_day_schedule(doctor_id: int, target_date: date) -> Dict[str, Any]:
-        """
-        Returns full breakdown of the doctor's day:
-        - All regular time slots (marked as available or booked)
-        - Confirmed booked appointments
-        - Cancelled appointments (for audit visibility)
-        """
+        """Returns full breakdown of the doctor's day."""
         doctor = db.session.get(Doctor, doctor_id)
         if not doctor:
             return {"success": False, "error": "Doctor not found."}
@@ -257,7 +485,6 @@ class BookingService:
         day_end = datetime.combine(target_date, doctor.shift_end or time(17, 0))
         slot_duration = timedelta(minutes=doctor.slot_duration_mins or 30)
 
-        # Retrieve all appointments for that day
         day_beginning = datetime.combine(target_date, time(0, 0, 0))
         day_ending = datetime.combine(target_date, time(23, 59, 59))
 
@@ -271,26 +498,23 @@ class BookingService:
             .all()
         )
 
-        booked_appointments = [a for a in all_appointments if a.status == "BOOKED"]
+        booked_appointments = [a for a in all_appointments if a.status in ("BOOKED", "COMPLETED", "NO_SHOW")]
         cancelled_appointments = [a for a in all_appointments if a.status == "CANCELLED"]
 
-        # Generate timeline slots from shift_start to shift_end
         timeline = []
         curr_time = day_start
         while curr_time + slot_duration <= day_end:
             slot_end = curr_time + slot_duration
 
-            # Find matching booked appointment if any
             matched_booking = None
             for apt in booked_appointments:
-                # If slot overlaps with booked appointment
                 if apt.start_time < slot_end and apt.end_time > curr_time:
                     matched_booking = apt
                     break
 
             if matched_booking:
                 timeline.append({
-                    "type": "BOOKED",
+                    "type": matched_booking.status,
                     "slot_start": curr_time.strftime("%H:%M"),
                     "slot_end": slot_end.strftime("%H:%M"),
                     "appointment": matched_booking.to_dict(),
@@ -313,7 +537,9 @@ class BookingService:
             "working_hours": f"{doctor.shift_start.strftime('%H:%M')} - {doctor.shift_end.strftime('%H:%M')}",
             "slot_duration_mins": doctor.slot_duration_mins,
             "timeline": timeline,
-            "booked_count": len(booked_appointments),
+            "booked_count": sum(1 for a in booked_appointments if a.status == "BOOKED"),
+            "completed_count": sum(1 for a in booked_appointments if a.status == "COMPLETED"),
+            "noshow_count": sum(1 for a in booked_appointments if a.status == "NO_SHOW"),
             "cancelled_count": len(cancelled_appointments),
             "cancelled_appointments": [a.to_dict() for a in cancelled_appointments],
         }

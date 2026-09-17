@@ -91,6 +91,13 @@ class Appointment(db.Model):
     fee_waived = db.Column(db.Boolean, default=False, nullable=False)
     waiver_reason = db.Column(db.Text, nullable=True)
     notes = db.Column(db.Text, nullable=True)
+    
+    # Twists support: reminders, completion, no-shows
+    reminder_sent = db.Column(db.Boolean, default=False, nullable=False)
+    reminder_sent_at = db.Column(db.DateTime, nullable=True)
+    no_show_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+
     created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
 
     __table_args__ = (
@@ -116,7 +123,39 @@ class Appointment(db.Model):
             "fee_waived": self.fee_waived,
             "waiver_reason": self.waiver_reason,
             "notes": self.notes,
+            "reminder_sent": self.reminder_sent,
+            "reminder_sent_at": self.reminder_sent_at.strftime("%Y-%m-%d %H:%M:%S") if self.reminder_sent_at else None,
+            "no_show_at": self.no_show_at.strftime("%Y-%m-%d %H:%M:%S") if self.no_show_at else None,
+            "completed_at": self.completed_at.strftime("%Y-%m-%d %H:%M:%S") if self.completed_at else None,
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else None,
+        }
+
+
+class NotificationOutbox(db.Model):
+    __tablename__ = "notification_outbox"
+
+    id = db.Column(db.Integer, primary_key=True)
+    appointment_id = db.Column(db.Integer, nullable=True, index=True)
+    patient_id = db.Column(db.Integer, nullable=True)
+    patient_name = db.Column(db.String(100), nullable=True)
+    recipient = db.Column(db.String(100), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    notification_type = db.Column(db.String(50), default="REMINDER", nullable=False)
+    sent_at = db.Column(db.DateTime, nullable=False, default=utc_now)
+    created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "appointment_id": self.appointment_id,
+            "patient_id": self.patient_id,
+            "patient_name": self.patient_name,
+            "recipient": self.recipient,
+            "phone": self.recipient,
+            "message": self.message,
+            "type": self.notification_type,
+            "sent_at": self.sent_at.strftime("%Y-%m-%d %H:%M:%S") if self.sent_at else None,
+            "timestamp": self.sent_at.isoformat() if self.sent_at else None,
         }
 
 

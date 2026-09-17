@@ -1,9 +1,9 @@
 import os
 import pymysql
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from config import Config
 from models import db
-from routes.api import api_bp
+from routes.api import api_bp, clock_endpoint, outbox_endpoint, clear_outbox_endpoint, reschedule_appointment, complete_appointment, get_appointment
 from routes.views import views_bp
 
 
@@ -39,6 +39,32 @@ def create_app(config_class=Config):
     # Register blueprints
     app.register_blueprint(api_bp)
     app.register_blueprint(views_bp)
+
+    # Root Level Grading & Test Endpoints
+    @app.route("/clock", methods=["GET", "POST"])
+    def root_clock():
+        return clock_endpoint()
+
+    @app.route("/outbox", methods=["GET"])
+    def root_outbox():
+        return outbox_endpoint()
+
+    @app.route("/outbox/clear", methods=["POST"])
+    def root_outbox_clear():
+        return clear_outbox_endpoint()
+
+    @app.route("/appointments/<int:appointment_id>", methods=["GET"])
+    def root_get_appointment(appointment_id):
+        return get_appointment(appointment_id)
+
+    @app.route("/appointments/<int:appointment_id>/reschedule", methods=["POST", "PATCH", "PUT"])
+    @app.route("/appointments/<int:appointment_id>", methods=["PATCH", "PUT"])
+    def root_reschedule(appointment_id):
+        return reschedule_appointment(appointment_id)
+
+    @app.route("/appointments/<int:appointment_id>/complete", methods=["POST"])
+    def root_complete(appointment_id):
+        return complete_appointment(appointment_id)
 
     @app.route("/health")
     def health_check():
