@@ -1,0 +1,61 @@
+/* Custom Clinic Front Desk UI styles */
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tab active styling */
+.tab-btn.active-tab {
+  border-color: #2563eb;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+/* Doctor selection pill styling */
+.doctor-pill {
+  transition: all 0.2s ease-in-out;
+}
+.doctor-pill.active {
+  background-color: #2563eb;
+  color: #ffffff;
+  border-color: #1d4ed8;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+/* Slot Card styling */
+.slot-card {
+  transition: all 0.15s ease-in-out;
+}
+.slot-card:hover {
+  transform: translateY(-2px);
+}
+
+/* Duration toggle buttons */
+.duration-btn.active-duration {
+  border-color: #2563eb;
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+/* Toast animations */
+#toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Custom scrollbar for modals */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

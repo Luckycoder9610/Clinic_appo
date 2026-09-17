@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareFlow Clinic | Front Desk Booking & Schedule</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+  <!-- TOP HEADER / NAV -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Brand & Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow-md shadow-blue-500/20">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-extrabold tracking-tight text-slate-900">CareFlow Clinic</h1>
+            <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Front Desk</span>
+          </div>
+          <p class="text-xs text-slate-500">Conflict-Free Booking & Fair Cancellation Engine</p>
+        </div>
+      </div>
+
+      <!-- Live Clock & Policy Info -->
+      <div class="flex items-center gap-3">
+        <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium">
+          <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span id="current-clock">Loading clock...</span>
+        </div>
+
+        <!-- Policy summary pill -->
+        <button id="open-settings-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium hover:bg-amber-100 transition">
+          <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+          <span id="policy-summary-text">Policy: 24h Notice | $25 Late Fee</span>
+          <svg class="w-3.5 h-3.5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+        </button>
+
+        <!-- Main Action Button -->
+        <button id="header-book-btn" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+          <span>Book Appointment</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- TABS BAR -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-8 border-t border-slate-100">
+      <button id="tab-schedule-btn" class="tab-btn active-tab flex items-center gap-2 py-3 text-sm font-medium border-b-2 border-blue-600 text-blue-600">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+        </svg>
+        <span>Doctor's Day Schedule</span>
+      </button>
+
+      <button id="tab-search-btn" class="tab-btn flex items-center gap-2 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+        <span>Find Patient / Lookups</span>
+      </button>
+
+      <button id="tab-doctors-btn" class="tab-btn flex items-center gap-2 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+        </svg>
+        <span>Doctors Directory</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- VIEW 1: DOCTOR'S DAY SCHEDULE -->
+    <section id="view-schedule" class="space-y-6">
+      
+      <!-- Doctor Selection & Date Controls Card -->
+      <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-4">
+        
+        <!-- Doctor Select Pills -->
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Select Doctor</label>
+          <div id="doctor-pills-container" class="flex flex-wrap gap-2.5">
+            <!-- Populated via JS -->
+            <div class="animate-pulse flex space-x-2">
+              <div class="h-10 w-36 bg-slate-200 rounded-xl"></div>
+              <div class="h-10 w-36 bg-slate-200 rounded-xl"></div>
+              <div class="h-10 w-36 bg-slate-200 rounded-xl"></div>
+            </div>
+          </div>
+        </div>
+
+        <hr class="border-slate-100">
+
+        <!-- Date Controls & Metrics -->
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          
+          <!-- Date Navigator -->
+          <div class="flex items-center gap-2">
+            <button id="prev-day-btn" class="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition" title="Previous Day">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+              </svg>
+            </button>
+
+            <button id="today-btn" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+              Today
+            </button>
+
+            <button id="tomorrow-btn" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+              Tomorrow
+            </button>
+
+            <input type="date" id="schedule-date-picker" class="px-3 py-1.5 text-sm font-medium rounded-lg border border-slate-200 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500">
+
+            <button id="next-day-btn" class="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition" title="Next Day">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Schedule Metrics -->
+          <div class="flex items-center gap-3 text-xs font-medium">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+              <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+              <span id="metric-booked">0 Booked</span>
+            </span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span id="metric-available">0 Available</span>
+            </span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+              <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+              <span id="metric-cancelled">0 Cancelled</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Schedule Timeline Grid -->
+      <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 id="schedule-header-title" class="text-lg font-bold text-slate-900">Dr. Schedule</h2>
+            <p id="schedule-header-sub" class="text-xs text-slate-500">Working hours: 09:00 - 17:00 (30 min slots)</p>
+          </div>
+          <span class="text-xs text-slate-400 flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Click any open slot to book instantly
+          </span>
+        </div>
+
+        <!-- Slots Container -->
+        <div id="timeline-slots-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-2">
+          <!-- Populated via JS -->
+        </div>
+
+        <!-- Cancelled Section (collapsed/expandable if any) -->
+        <div id="cancelled-appointments-section" class="pt-6 border-t border-slate-100 hidden">
+          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+            <span>Cancelled Appointments Today</span>
+          </h3>
+          <div id="cancelled-appointments-list" class="space-y-2"></div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- VIEW 2: PATIENT SEARCH & APPOINTMENT LOOKUP -->
+    <section id="view-search" class="hidden space-y-6">
+      <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">Find Patient Appointment</h2>
+          <p class="text-xs text-slate-500">Look up any patient's appointments by full or partial name, or phone number.</p>
+        </div>
+
+        <!-- Search Input -->
+        <div class="relative max-w-2xl">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+          <input type="text" id="patient-search-input" placeholder="Type patient name (e.g. 'John', 'Garcia') or phone..." class="block w-full pl-10 pr-10 py-3 text-sm rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50/50">
+          <button id="clear-search-btn" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 hidden">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Search Results Area -->
+      <div id="search-results-container" class="space-y-4">
+        <!-- Will populate or show empty state -->
+        <div class="bg-white rounded-2xl p-10 border border-slate-200 text-center text-slate-500">
+          <svg class="w-12 h-12 mx-auto text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+          </svg>
+          <p class="font-medium">Enter a patient name or phone number above to find appointments.</p>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- VIEW 3: DOCTORS DIRECTORY -->
+    <section id="view-doctors" class="hidden space-y-6">
+      <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">Clinic Doctors Roster</h2>
+          <p class="text-xs text-slate-500">Active medical staff, their working hours, and slot durations.</p>
+        </div>
+        <button id="add-doctor-modal-btn" class="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
+          + Add New Doctor
+        </button>
+      </div>
+
+      <div id="doctors-grid" class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <!-- Populated via JS -->
+      </div>
+    </section>
+
+  </main>
+
+
+  <!-- FOOTER -->
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+    CareFlow Front Desk Booking System &bull; Conflict-Free Engine with Fair Cancellation Rules &bull; MySQL Database
+  </footer>
+
+
+  <!-- MODAL: BOOK APPOINTMENT -->
+  <div id="modal-book" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl mx-4 border border-slate-100 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">Book Patient Appointment</h3>
+          <p class="text-xs text-slate-500">Conflict-free guaranteed booking</p>
+        </div>
+        <button id="close-book-modal-btn" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <!-- Conflict Error Alert Box -->
+      <div id="book-error-box" class="mt-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs hidden">
+        <div class="flex items-start gap-2.5">
+          <svg class="w-4 h-4 text-rose-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+          <div id="book-error-message" class="font-medium"></div>
+        </div>
+      </div>
+
+      <form id="book-form" class="mt-4 space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Doctor</label>
+          <select id="book-doctor-select" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500"></select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Date</label>
+            <input type="date" id="book-date-input" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Start Time</label>
+            <input type="time" id="book-time-input" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Duration</label>
+          <div class="grid grid-cols-4 gap-2">
+            <button type="button" data-duration="15" class="duration-btn py-1.5 rounded-lg border border-slate-200 text-center font-medium hover:bg-slate-50">15 min</button>
+            <button type="button" data-duration="30" class="duration-btn active-duration py-1.5 rounded-lg border border-blue-600 bg-blue-50 text-blue-700 text-center font-semibold">30 min</button>
+            <button type="button" data-duration="45" class="duration-btn py-1.5 rounded-lg border border-slate-200 text-center font-medium hover:bg-slate-50">45 min</button>
+            <button type="button" data-duration="60" class="duration-btn py-1.5 rounded-lg border border-slate-200 text-center font-medium hover:bg-slate-50">60 min</button>
+          </div>
+          <input type="hidden" id="book-duration" value="30">
+        </div>
+
+        <hr class="border-slate-100">
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Patient Full Name</label>
+          <input type="text" id="book-patient-name" required placeholder="e.g. Eleanor Rigby" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Phone Number</label>
+            <input type="tel" id="book-patient-phone" required placeholder="(555) 000-0000" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Email (Optional)</label>
+            <input type="email" id="book-patient-email" placeholder="patient@example.com" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Reason for Visit / Notes (Optional)</label>
+          <textarea id="book-notes" rows="2" placeholder="e.g. Persistent cough, prescription refill" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500"></textarea>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" id="cancel-book-modal-btn" class="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium">Cancel</button>
+          <button type="submit" id="submit-book-btn" class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 shadow-sm">
+            <span>Confirm Booking</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- MODAL: FAIR CANCELLATION -->
+  <div id="modal-cancel" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl mx-4 border border-slate-100 space-y-4">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">Cancel Appointment</h3>
+          <p class="text-xs text-slate-500">Fair Cancellation Policy Evaluation</p>
+        </div>
+        <button id="close-cancel-modal-btn" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <!-- Appointment Details Card -->
+      <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+        <div class="flex justify-between">
+          <span class="text-slate-500">Patient:</span>
+          <span id="cancel-modal-patient" class="font-bold text-slate-800">-</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Doctor:</span>
+          <span id="cancel-modal-doctor" class="font-medium text-slate-800">-</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Scheduled Time:</span>
+          <span id="cancel-modal-time" class="font-medium text-slate-800">-</span>
+        </div>
+      </div>
+
+      <!-- Dynamic Policy Evaluation Box -->
+      <div id="cancel-policy-evaluation-box" class="p-4 rounded-xl text-xs space-y-1">
+        <!-- Populated via JS: Green if on-time, Orange/Red if late -->
+      </div>
+
+      <form id="cancel-form" class="space-y-3.5 text-xs">
+        <input type="hidden" id="cancel-appointment-id">
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Cancellation Reason</label>
+          <input type="text" id="cancel-reason-input" placeholder="e.g. Resolved symptoms, scheduling conflict" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- Emergency Fee Waiver Section -->
+        <div id="cancel-waiver-container" class="p-3 rounded-xl border border-amber-200 bg-amber-50/70 space-y-2 hidden">
+          <label class="flex items-center gap-2 cursor-pointer font-semibold text-amber-900">
+            <input type="checkbox" id="cancel-waive-checkbox" class="rounded text-amber-600 focus:ring-amber-500">
+            <span>Waive late cancellation fee (Staff discretion)</span>
+          </label>
+          <div id="cancel-waiver-reason-block" class="hidden">
+            <input type="text" id="cancel-waiver-reason" placeholder="Waiver justification (e.g. Hospitalized, severe emergency)" class="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 text-xs focus:ring-amber-500 bg-white">
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" id="abort-cancel-btn" class="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium">Keep Appointment</button>
+          <button type="submit" id="confirm-cancel-btn" class="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold">Confirm Cancellation</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- MODAL: CLINIC SETTINGS -->
+  <div id="modal-settings" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs hidden">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl mx-4 border border-slate-100 space-y-4">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">Clinic Cancellation Policy</h3>
+          <p class="text-xs text-slate-500">Front desk policy configuration</p>
+        </div>
+        <button id="close-settings-modal-btn" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <form id="settings-form" class="space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Cancellation Cutoff Window (Hours)</label>
+          <div class="flex items-center gap-2">
+            <input type="number" id="settings-cutoff" min="1" max="168" step="1" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 font-semibold">
+            <span class="text-slate-500 font-medium">hours</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1">Cancellations with less notice than this are treated as late.</p>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Late Cancellation Fee ($)</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-bold">$</div>
+            <input type="number" id="settings-fee" min="0" max="1000" step="5" required class="w-full pl-7 pr-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 font-semibold">
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" id="cancel-settings-btn" class="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold">Save Policy</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- MODAL: ADD DOCTOR -->
+  <div id="modal-add-doctor" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl mx-4 border border-slate-100 space-y-4">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">Add Doctor to Clinic</h3>
+          <p class="text-xs text-slate-500">Configure physician roster and shift</p>
+        </div>
+        <button id="close-doctor-modal-btn" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <form id="add-doctor-form" class="space-y-3.5 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Doctor Full Name</label>
+          <input type="text" id="doc-name" required placeholder="e.g. Dr. Julian Bashir" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Specialty</label>
+          <input type="text" id="doc-specialty" required placeholder="e.g. Dermatology, Orthopedics" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Shift Start</label>
+            <input type="time" id="doc-start" value="09:00" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Shift End</label>
+            <input type="time" id="doc-end" value="17:00" required class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Slot Duration (Minutes)</label>
+          <select id="doc-duration" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500">
+            <option value="15">15 minutes</option>
+            <option value="30" selected>30 minutes (Standard)</option>
+            <option value="45">45 minutes</option>
+            <option value="60">60 minutes</option>
+          </select>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" id="cancel-doctor-btn" class="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold">Save Doctor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 max-w-sm rounded-xl px-4 py-3 shadow-xl flex items-center gap-3 text-xs font-medium">
+    <span id="toast-icon"></span>
+    <span id="toast-msg">Notification</span>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
